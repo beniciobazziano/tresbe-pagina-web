@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+@theme {
+  /* Marca Tresbe: azul acero + verde lima del logo */
+  --color-steel-50: #f2f6f9;
+  --color-steel-100: #e0eaf0;
+  --color-steel-200: #c2d6e1;
+  --color-steel-300: #9abccd;
+  --color-steel-400: #719cb2;
+  --color-steel-500: #4d7e98;
+  --color-steel-600: #3f687e;
+  --color-steel-700: #365568;
+  --color-steel-800: #2d4655;
+  --color-steel-900: #203440;
+  --color-steel-950: #142129;
+
+  --color-lime-50: #f7f9ec;
+  --color-lime-100: #eef3d4;
+  --color-lime-200: #dde7ab;
+  --color-lime-300: #c6d77a;
+  --color-lime-400: #b5ca5e;
+  --color-lime-500: #a4bb43;
+  --color-lime-600: #869a31;
+  --color-lime-700: #67772a;
+  --color-lime-800: #525f26;
+  --color-lime-900: #465124;
+  --color-lime-950: #242c0f;
+
+  /* Neutros hormigón */
+  --color-concrete-50: #f7f7f6;
+  --color-concrete-100: #ecedeb;
+  --color-concrete-200: #d9dad7;
+  --color-concrete-300: #bcbeb9;
+  --color-concrete-400: #9a9d96;
+  --color-concrete-500: #7e817a;
+  --color-concrete-600: #666963;
+  --color-concrete-700: #535551;
+  --color-concrete-800: #464845;
+  --color-concrete-900: #3d3e3c;
+  --color-concrete-950: #232422;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-grotesk), var(--font-inter), ui-sans-serif, sans-serif;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-concrete-50 text-concrete-950 antialiased;
+}
+
+/* Retícula tipo plano arquitectónico para fondos oscuros */
+.blueprint-grid {
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.06) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* Retícula sutil para fondos claros */
+.blueprint-grid-light {
+  background-image:
+    linear-gradient(to right, rgb(20 33 41 / 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(20 33 41 / 0.05) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* Etiqueta técnica en mayúsculas */
+.tech-label {
+  @apply text-xs font-semibold uppercase tracking-[0.2em];
+}
