@@ -3,6 +3,8 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  FileDown,
+  FileUp,
   Loader2,
   Package,
   Pencil,
@@ -13,6 +15,7 @@ import {
 } from "lucide-react";
 import { StockDot, STOCK_LABEL } from "@/components/StockDot";
 import { BRANDS } from "@/lib/brands";
+import { defaultIsDistributor } from "@/lib/distributor";
 import { formatARS } from "@/lib/site";
 import type { Category, Product, StockStatus } from "@/lib/types";
 
@@ -53,6 +56,15 @@ export function ProductsPanel() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    updated: number;
+    created: number;
+    totalRows: number;
+    errors: string[];
+    warnings: string[];
+    moreErrors: number;
+  } | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/products", { cache: "no-store" });
@@ -139,6 +151,37 @@ export function ProductsPanel() {
     setDraft((d) => (d ? { ...d, image_url: data.url } : d));
   }
 
+  async function importExcel(file: File) {
+    setImporting(true);
+    setImportResult(null);
+    setError(null);
+    try {
+      const dataBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () =>
+          resolve((reader.result as string).split(",")[1] ?? "");
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const res = await fetch("/api/admin/products/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: file.name, dataBase64 }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "No se pudo importar el archivo.");
+      } else {
+        setImportResult(data);
+        await load();
+      }
+    } catch {
+      setError("No se pudo leer el archivo.");
+    } finally {
+      setImporting(false);
+    }
+  }
+
   const filtered = useMemo(() => {
     if (!filter.trim()) return products;
     const q = filter.toLowerCase();
@@ -170,17 +213,92 @@ export function ProductsPanel() {
           placeholder="Filtrar productos…"
           className="h-10 w-64 rounded-full border border-concrete-300 bg-white px-4 text-sm outline-none focus:border-steel-500"
         />
-        <button
-          type="button"
-          onClick={() => setDraft(emptyDraft(categories[0]?.slug ?? ""))}
-          className="flex h-10 items-center gap-2 rounded-full bg-steel-600 px-4 text-sm font-semibold text-white hover:bg-steel-700"
-        >
-          <Plus className="size-4" /> Nuevo producto
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <a
+            href="/api/admin/products/export"
+            className="flex h-10 items-center gap-2 rounded-full border border-steel-300 px-4 text-sm font-semibold text-steel-700 hover:bg-steel-50"
+          >
+            <FileDown className="size-4" /> Descargar Excel
+          </a>
+          <label className="flex h-10 cursor-pointer items-center gap-2 rounded-full border border-steel-300 px-4 text-sm font-semibold text-steel-700 hover:bg-steel-50">
+            {importing ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <FileUp className="size-4" />
+            )}
+            Importar Excel
+            <input
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              className="hidden"
+              disabled={importing}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) importExcel(file);
+                e.target.value = "";
+              }}
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => setDraft(emptyDraft(categories[0]?.slug ?? ""))}
+            className="flex h-10 items-center gap-2 rounded-full bg-steel-600 px-4 text-sm font-semibold text-white hover:bg-steel-700"
+          >
+            <Plus className="size-4" /> Nuevo producto
+          </button>
+        </div>
       </div>
+
+      <p className="mt-3 text-xs leading-5 text-concrete-500">
+        <strong>Actualización por Excel:</strong> descargá el catálogo, editá
+        precios, stock o agregá filas nuevas, y volvé a importarlo. Las celdas
+        vacías no modifican nada (sirve para planillas de solo código +
+        precio). El Excel nunca borra productos. Para cargar productos nuevos
+        en lote,{" "}
+        <a
+          href="/api/admin/products/template"
+          className="font-semibold text-steel-600 underline hover:text-steel-800"
+        >
+          descargá la plantilla vacía
+        </a>
+        .
+      </p>
 
       {error && (
         <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-800">{error}</p>
+      )}
+
+      {importResult && (
+        <div className="mt-4 rounded-lg bg-lime-50 p-4 text-sm text-lime-900">
+          <p className="font-semibold">
+            Importación lista: {importResult.updated} actualizado
+            {importResult.updated !== 1 && "s"}, {importResult.created} creado
+            {importResult.created !== 1 && "s"} (de {importResult.totalRows} fila
+            {importResult.totalRows !== 1 && "s"}).
+          </p>
+          {importResult.warnings.length > 0 && (
+            <ul className="mt-2 list-disc space-y-0.5 pl-5 text-xs text-amber-800">
+              {importResult.warnings.map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
+          )}
+          {importResult.errors.length > 0 && (
+            <div className="mt-2">
+              <p className="text-xs font-semibold text-red-800">
+                Filas con problemas (no se aplicaron):
+              </p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-red-800">
+                {importResult.errors.map((e, i) => (
+                  <li key={i}>{e}</li>
+                ))}
+                {importResult.moreErrors > 0 && (
+                  <li>… y {importResult.moreErrors} más</li>
+                )}
+              </ul>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Formulario alta/edición */}
@@ -297,6 +415,48 @@ export function ProductsPanel() {
                 </span>
               )}
             </label>
+            {/* Peso y medidas: con esto la web cotiza el envío real */}
+            <fieldset className="sm:col-span-2 lg:col-span-3">
+              <legend className="mb-1 text-sm font-medium">
+                Peso y medidas de una unidad{" "}
+                <span className="font-normal text-concrete-500">
+                  (para cotizar el envío; vacío = estimado por rubro)
+                </span>
+              </legend>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {(
+                  [
+                    ["weight_kg", "Peso (kg)", "2.6"],
+                    ["length_cm", "Largo (cm)", "38"],
+                    ["width_cm", "Ancho (cm)", "12"],
+                    ["height_cm", "Alto (cm)", "15"],
+                  ] as const
+                ).map(([campo, label, ejemplo]) => (
+                  <label key={campo} className="block text-sm">
+                    <span className="mb-1 block text-xs text-concrete-600">
+                      {label}
+                    </span>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={draft[campo] ?? ""}
+                      onChange={(e) =>
+                        setDraft({
+                          ...draft,
+                          [campo]:
+                            e.target.value === ""
+                              ? undefined
+                              : Number(e.target.value),
+                        })
+                      }
+                      className="h-10 w-full rounded-lg border border-concrete-300 bg-white px-3 text-sm outline-none focus:border-steel-500 focus:ring-2 focus:ring-steel-200"
+                      placeholder={ejemplo}
+                    />
+                  </label>
+                ))}
+              </div>
+            </fieldset>
             <label className="block text-sm sm:col-span-2 lg:col-span-3">
               <span className="mb-1 block font-medium">Descripción</span>
               <textarea
@@ -333,6 +493,22 @@ export function ProductsPanel() {
                   className="size-4 accent-steel-600"
                 />
                 Visible en la tienda
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={
+                    draft.distributor ?? defaultIsDistributor({
+                      brand: draft.brand,
+                      name: draft.name,
+                    })
+                  }
+                  onChange={(e) =>
+                    setDraft({ ...draft, distributor: e.target.checked })
+                  }
+                  className="size-4 accent-steel-600"
+                />
+                Lo distribuimos (sección distribuidora)
               </label>
             </div>
           </div>
@@ -400,6 +576,16 @@ export function ProductsPanel() {
                   {product.unit} · {STOCK_LABEL[product.stock_status]} · stock{" "}
                   {product.stock}
                   {product.bulky && " · voluminoso"}
+                  {(product.distributor ??
+                    defaultIsDistributor({
+                      brand: product.brand,
+                      name: product.name,
+                    })) && (
+                    <span className="font-semibold text-steel-700">
+                      {" "}
+                      · distribuidora
+                    </span>
+                  )}
                 </p>
               </div>
               <p className="shrink-0 font-display font-bold text-steel-700">

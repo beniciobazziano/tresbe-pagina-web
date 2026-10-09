@@ -10,6 +10,7 @@ const STATUS_OPTIONS: { value: OrderStatus; label: string; badge: string }[] = [
   { value: "a_cotizar", label: "A cotizar flete", badge: "bg-lime-100 text-lime-800" },
   { value: "pagado", label: "Pagado", badge: "bg-emerald-100 text-emerald-800" },
   { value: "preparando", label: "En preparación", badge: "bg-steel-100 text-steel-800" },
+  { value: "enviado", label: "Enviado", badge: "bg-sky-100 text-sky-800" },
   { value: "entregado", label: "Entregado", badge: "bg-concrete-100 text-concrete-700" },
   { value: "cancelado", label: "Cancelado", badge: "bg-red-100 text-red-800" },
 ];
@@ -101,6 +102,11 @@ export function OrdersPanel() {
                 })}
               </span>
               <span className="text-sm font-medium">{order.customer_name}</span>
+              {order.order_type === "distribuidora" && (
+                <span className="rounded-full bg-steel-100 px-2.5 py-1 text-xs font-semibold text-steel-800">
+                  Nota de pedido
+                </span>
+              )}
               <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${status?.badge}`}>
                 {status?.label}
               </span>
@@ -137,6 +143,25 @@ export function OrdersPanel() {
                     {SHIPPING_LABEL[order.shipping_method]}
                     {order.shipping_address && ` — ${order.shipping_address}`}
                   </p>
+                  {order.tracking && (order.tracking.carrier || order.tracking.code) && (
+                    <p>
+                      <span className="font-medium">Seguimiento:</span>{" "}
+                      {[order.tracking.carrier, order.tracking.code].filter(Boolean).join(" · ")}
+                      {order.tracking.url && (
+                        <>
+                          {" "}
+                          <a
+                            href={order.tracking.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-steel-600 underline"
+                          >
+                            ver envío
+                          </a>
+                        </>
+                      )}
+                    </p>
+                  )}
                   <p>
                     <span className="font-medium">Contacto:</span>{" "}
                     {order.customer_phone} · {order.customer_email}

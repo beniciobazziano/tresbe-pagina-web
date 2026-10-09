@@ -8,6 +8,7 @@ import {
   localGetOrders,
   localGetProducts,
   localListCustomers,
+  localSaveProducts,
   localUpdateOrderStatus,
   localUpsertCustomer,
   localUpsertProduct,
@@ -17,6 +18,7 @@ import { createSupabaseServerClient } from "./supabase/server";
 import type {
   AdminCustomer,
   Category,
+  CustomerType,
   Order,
   OrderStatus,
   Product,
@@ -77,6 +79,42 @@ export async function adminDeleteProduct(id: string) {
   if (error) throw new Error(error.message);
 }
 
+/**
+ * Importación masiva desde Excel: aplica actualizaciones y altas en una
+ * sola pasada (una escritura en modo local; lotes en Supabase).
+ */
+export async function adminBulkImportProducts(
+  updates: Product[],
+  creates: Omit<Product, "id">[]
+) {
+  if (!isSupabaseConfigured) {
+    const products = await localGetProducts();
+    const byId = new Map(products.map((p) => [p.id, p]));
+    for (const update of updates) byId.set(update.id, update);
+    const merged = [...byId.values()];
+    for (const create of creates) {
+      merged.push({ ...create, id: crypto.randomUUID() });
+    }
+    await localSaveProducts(merged);
+    return;
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const CHUNK = 400;
+  for (let i = 0; i < updates.length; i += CHUNK) {
+    const { error } = await supabase
+      .from("products")
+      .upsert(updates.slice(i, i + CHUNK), { onConflict: "id" });
+    if (error) throw new Error(error.message);
+  }
+  for (let i = 0; i < creates.length; i += CHUNK) {
+    const { error } = await supabase
+      .from("products")
+      .insert(creates.slice(i, i + CHUNK));
+    if (error) throw new Error(error.message);
+  }
+}
+
 /** Carga el catálogo inicial de ejemplo (solo tiene efecto con Supabase). */
 export async function adminImportSeed() {
   if (!isSupabaseConfigured) {
@@ -130,6 +168,7 @@ export interface CustomerDraft {
   discount_pct: number;
   notes: string | null;
   active: boolean;
+  customer_type: CustomerType;
 }
 
 export async function adminListCustomers(): Promise<AdminCustomer[]> {
@@ -137,7 +176,7 @@ export async function adminListCustomers(): Promise<AdminCustomer[]> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("customers")
-    .select("id, username, name, discount_pct, notes, active")
+    .select("id, username, name, discount_pct, notes, active, customer_type")
     .order("name");
   if (error) throw new Error(error.message);
   return (data ?? []) as AdminCustomer[];
@@ -157,6 +196,7 @@ export async function adminUpsertCustomer(draft: CustomerDraft) {
     p_discount: draft.discount_pct,
     p_notes: draft.notes,
     p_active: draft.active,
+    p_type: draft.customer_type,
   });
   if (error) throw new Error(error.message);
 }

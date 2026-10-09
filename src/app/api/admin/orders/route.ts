@@ -8,6 +8,7 @@ const VALID_STATUS: OrderStatus[] = [
   "pagado",
   "a_cotizar",
   "preparando",
+  "enviado",
   "entregado",
   "cancelado",
 ];

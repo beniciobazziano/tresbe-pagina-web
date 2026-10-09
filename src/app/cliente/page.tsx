@@ -6,12 +6,14 @@ import { useEffect } from "react";
 import {
   ArrowRight,
   BadgePercent,
+  ClipboardList,
   LogOut,
   MessageCircle,
   StickyNote,
   UserRound,
 } from "lucide-react";
 import { useCustomer } from "@/components/customer/CustomerProvider";
+import { DatosEntrega } from "@/components/customer/DatosEntrega";
 import { whatsappLink } from "@/lib/site";
 
 export default function ClientePage() {
@@ -23,6 +25,10 @@ export default function ClientePage() {
   }, [ready, customer, router]);
 
   if (!ready || !customer) return <div className="min-h-[50vh]" />;
+
+  // Cuenta abierta desde la web (compra y paga como cualquiera) vs. cuenta
+  // de Tresbe con condiciones acordadas (pide por nota de pedido)
+  const cuentaTresbe = !customer.self_registered;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
@@ -48,7 +54,33 @@ export default function ClientePage() {
         </button>
       </div>
 
-      <div className="mt-8 grid gap-5 sm:grid-cols-2">
+      {/* Acceso principal: comprar con la cuenta */}
+      <Link
+        href="/productos"
+        className="blueprint-grid group mt-8 flex flex-col gap-4 rounded-2xl bg-steel-950 p-6 text-white transition-transform hover:-translate-y-0.5 sm:flex-row sm:items-center sm:justify-between lg:p-8"
+      >
+        <div className="flex items-start gap-4">
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-lime-500 text-steel-950">
+            <ClipboardList className="size-6" />
+          </div>
+          <div>
+            <h2 className="font-display text-xl font-bold">
+              {cuentaTresbe ? "Hacer un pedido a la distribuidora" : "Hacer un pedido"}
+            </h2>
+            <p className="mt-1 max-w-xl text-sm leading-6 text-steel-100">
+              {cuentaTresbe
+                ? "Cargá el carrito con lo que necesites y enviá el pedido: sin pagar online, nos llega la nota y lo preparamos."
+                : "Cargá el carrito y al finalizar calculamos el envío a tu código postal antes de que pagues."}
+            </p>
+          </div>
+        </div>
+        <span className="flex h-12 shrink-0 items-center gap-2 self-start rounded-full bg-lime-500 px-6 text-sm font-semibold text-steel-950 sm:self-center">
+          Ver catálogo{" "}
+          <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
+        </span>
+      </Link>
+
+      <div className="mt-5 grid gap-5 sm:grid-cols-2">
         <div className="rounded-2xl border border-lime-200 bg-lime-50 p-6">
           <div className="flex items-center gap-3">
             <BadgePercent className="size-6 text-lime-700" />
@@ -68,8 +100,9 @@ export default function ClientePage() {
             </>
           ) : (
             <p className="mt-4 text-sm leading-6 text-lime-900/80">
-              Tu cuenta todavía no tiene un descuento asignado. Consultanos por
-              WhatsApp.
+              {cuentaTresbe
+                ? "Tu cuenta todavía no tiene un descuento asignado. Consultanos por WhatsApp."
+                : "Si comprás para revender, escribinos por WhatsApp y te pasamos tu cuenta con descuentos."}
             </p>
           )}
         </div>
@@ -85,6 +118,8 @@ export default function ClientePage() {
           </p>
         </div>
       </div>
+
+      <DatosEntrega customer={customer} />
 
       <div className="mt-8 flex flex-wrap gap-3">
         <Link

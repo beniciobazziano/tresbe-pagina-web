@@ -1,12 +1,28 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronRight, MessageCircle, Store, Truck } from "lucide-react";
+import {
+  ChevronRight,
+  MessageCircle,
+  Store,
+  TrendingUp,
+  Truck,
+} from "lucide-react";
 import { getCategoryBySlug, getProductBySlug, getProducts } from "@/lib/catalog";
-import { formatARS, whatsappLink } from "@/lib/site";
-import { AddToCartButton } from "@/components/cart/AddToCartButton";
+import { getSessionCustomer } from "@/lib/customers";
+import { customerPricing } from "@/lib/pricing";
+import {
+  discountedPrice,
+  formatARS,
+  formatPriceLabel,
+  whatsappLink,
+} from "@/lib/site";
+import { ProductDescriptionSpecs } from "@/components/ProductDescriptionSpecs";
+import { ProductGallery } from "@/components/ProductGallery";
+import { ProductMoreInfo } from "@/components/ProductMoreInfo";
+import { ProductPurchasePanel } from "@/components/ProductPurchasePanel";
+import { ProductVariantProvider } from "@/components/ProductVariantProvider";
 import { ProductCard } from "@/components/ProductCard";
-import { ProductImage } from "@/components/ProductImage";
 import { StockDot, STOCK_LABEL } from "@/components/StockDot";
 
 export async function generateMetadata({
@@ -29,11 +45,18 @@ export default async function ProductoPage({
   const product = await getProductBySlug(slug);
   if (!product || !product.active) notFound();
 
-  const [category, related] = await Promise.all([
+  const [category, related, customer] = await Promise.all([
     getCategoryBySlug(product.category_slug),
     getProducts({ categorySlug: product.category_slug }),
+    getSessionCustomer(),
   ]);
   const others = related.filter((p) => p.id !== product.id).slice(0, 4);
+
+  // Cliente con cuenta: ve su costo y su precio de venta
+  const costo = customer
+    ? discountedPrice(product.price, customer.discount_pct)
+    : product.price;
+  const { markupPct, sale } = customerPricing(costo, product.brand, customer);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
@@ -57,13 +80,11 @@ export default async function ProductoPage({
         <span className="text-concrete-800">{product.name}</span>
       </nav>
 
+      <ProductVariantProvider product={product}>
       <div className="mt-8 grid gap-10 lg:grid-cols-2">
-        <div className="relative aspect-square overflow-hidden rounded-2xl border border-concrete-200 bg-white">
-          <ProductImage
-            product={product}
-            sizes="(min-width: 1024px) 50vw, 100vw"
-            iconSize="size-28"
-          />
+        <div>
+          <ProductGallery product={product} />
+          <ProductMoreInfo product={product} />
         </div>
 
         <div>
@@ -92,16 +113,58 @@ export default async function ProductoPage({
             )}
           </p>
 
-          <p className="mt-6 font-display text-4xl font-bold text-steel-700">
-            {formatARS(product.price)}
-          </p>
-          <p className="mt-1 text-xs text-concrete-500">
-            Precio en pesos argentinos, IVA incluido.
-          </p>
+          {customer && product.price > 0 ? (
+            <div className="mt-6 overflow-hidden rounded-2xl border border-concrete-200">
+              <div className="flex flex-wrap items-end justify-between gap-4 bg-white p-5">
+                <div>
+                  <p className="tech-label text-[10px] text-steel-500">Tu costo</p>
+                  <p className="mt-1 font-display text-4xl font-bold text-steel-700">
+                    {formatARS(costo)}
+                  </p>
+                  {customer.discount_pct > 0 && (
+                    <p className="mt-1 text-xs text-concrete-500">
+                      Lista {formatARS(product.price)} · tu descuento{" "}
+                      {customer.discount_pct}%
+                    </p>
+                  )}
+                </div>
+                {sale != null && (
+                  <div className="text-right">
+                    <p className="tech-label text-[10px] text-lime-700">
+                      Tu precio de venta
+                    </p>
+                    <p className="mt-1 font-display text-3xl font-bold text-lime-700">
+                      {formatARS(sale)}
+                    </p>
+                    <p className="mt-1 text-xs text-concrete-500">
+                      rentabilidad {markupPct}% · ganás{" "}
+                      {formatARS(sale - costo)}
+                    </p>
+                  </div>
+                )}
+              </div>
+              {sale == null && (
+                <Link
+                  href="/cliente/rentabilidades"
+                  className="flex items-center gap-2 border-t border-concrete-200 bg-lime-50 px-5 py-3 text-xs font-semibold text-lime-800 hover:bg-lime-100"
+                >
+                  <TrendingUp className="size-4" />
+                  Cargá tu rentabilidad para ver acá tu precio de venta →
+                </Link>
+              )}
+            </div>
+          ) : (
+            <>
+              <p className="mt-6 font-display text-4xl font-bold text-steel-700">
+                {formatPriceLabel(product.price)}
+              </p>
+              <p className="mt-1 text-xs text-concrete-500">
+                Precio en pesos argentinos, IVA incluido.
+              </p>
+            </>
+          )}
 
-          <div className="mt-8">
-            <AddToCartButton product={product} />
-          </div>
+          <ProductPurchasePanel product={product} />
 
           <div className="mt-8 space-y-3 rounded-xl border border-concrete-200 bg-white p-5 text-sm">
             <div className="flex items-start gap-3">
@@ -126,19 +189,51 @@ export default async function ProductoPage({
             </div>
           </div>
 
-          <p className="mt-8 leading-7 text-concrete-700">{product.description}</p>
+          <ProductDescriptionSpecs product={product} />
 
-          {product.specs.length > 0 && (
+          {product.spec_table && product.spec_table.rows.length > 0 && (
             <div className="mt-8">
-              <h2 className="tech-label text-steel-500">Ficha técnica</h2>
-              <dl className="mt-3 divide-y divide-concrete-200 overflow-hidden rounded-xl border border-concrete-200 bg-white">
-                {product.specs.map((spec) => (
-                  <div key={spec.label} className="grid grid-cols-2 gap-4 px-5 py-3 text-sm">
-                    <dt className="font-medium text-concrete-600">{spec.label}</dt>
-                    <dd className="text-concrete-950">{spec.value}</dd>
-                  </div>
-                ))}
-              </dl>
+              <h2 className="tech-label text-steel-500">
+                Medidas y especificaciones
+              </h2>
+              <p className="mt-1 text-xs text-concrete-500">
+                Datos oficiales del fabricante · {product.spec_table.rows.length}{" "}
+                medida{product.spec_table.rows.length !== 1 && "s"}
+              </p>
+              <div className="mt-3 overflow-x-auto rounded-xl border border-concrete-200 bg-white">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-concrete-200 bg-concrete-50">
+                      {product.spec_table.headers.map((h) => (
+                        <th
+                          key={h}
+                          className="whitespace-nowrap px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-concrete-600"
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-concrete-100">
+                    {product.spec_table.rows.map((row, i) => (
+                      <tr key={i} className="hover:bg-steel-50/60">
+                        {row.map((cell, j) => (
+                          <td
+                            key={j}
+                            className={`whitespace-nowrap px-3 py-2 ${
+                              j === 0
+                                ? "font-semibold text-concrete-950"
+                                : "text-concrete-700"
+                            }`}
+                          >
+                            {cell}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
@@ -155,6 +250,7 @@ export default async function ProductoPage({
           </a>
         </div>
       </div>
+      </ProductVariantProvider>
 
       {others.length > 0 && (
         <section className="mt-20">
@@ -163,7 +259,7 @@ export default async function ProductoPage({
           </h2>
           <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
             {others.map((p) => (
-              <ProductCard key={p.id} product={p} />
+              <ProductCard key={p.id} product={p} customer={customer} />
             ))}
           </div>
         </section>

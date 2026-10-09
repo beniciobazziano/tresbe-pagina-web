@@ -40,6 +40,8 @@ export async function POST(request: Request) {
       discount_pct: Math.min(90, Math.max(0, Number(draft.discount_pct) || 0)),
       notes: draft.notes?.trim() || null,
       active: draft.active !== false,
+      customer_type:
+        draft.customer_type === "distribuidora" ? "distribuidora" : "publico",
     });
     return NextResponse.json({ ok: true });
   } catch (error) {

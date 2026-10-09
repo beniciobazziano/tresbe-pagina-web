@@ -57,6 +57,35 @@ El panel `/admin` **funciona completo sin configurar nada**: se entra con el usu
 
 > Nota: verificá en tu cuenta de Stripe que ARS esté habilitado como moneda de cobro.
 
+## Conectar con Bynet
+
+[Bynet](../bynet-erp) (el sistema de gestión de escritorio) se vincula con la tienda por HTTPS: cada pocos minutos trae los pedidos y las notas de pedido nuevos, actualiza el estado de los pedidos que preparás y publica catálogo, precios y stock. El protocolo completo está en `bynet-erp/docs/bynet-connect.md`; la tienda lo expone bajo `/api/bynet`.
+
+1. En `.env.local` definí `BYNET_API_KEY` con un texto largo y aleatorio (por ejemplo `node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"`) y reiniciá `npm run dev`.
+2. Entrá a `/admin/configuracion` → **Conectar con Bynet**: ahí ves la URL base, si la clave está cargada (solo los últimos 4 caracteres) y un botón **Probar conexión**.
+3. En Bynet → **Página web → Vincular** pegá la URL de la tienda y la misma clave.
+
+Con Supabase configurado, agregá también `SUPABASE_SERVICE_ROLE_KEY` (Project Settings → API) para que Bynet pueda escribir pedidos y catálogo sin sesión de administrador, y ejecutá el bloque "Bynet Connect" del final de `supabase/schema.sql` (agrega `updated_at`, `tracking`, `cuit` y el estado `enviado`).
+
+Probar a mano con curl (reemplazá la clave):
+
+```bash
+KEY=tu_clave
+curl -H "Authorization: Bearer $KEY" http://localhost:3000/api/bynet/ping
+curl -H "Authorization: Bearer $KEY" "http://localhost:3000/api/bynet/orders?since=2026-01-01T00:00:00.000Z&limit=50"
+curl -H "Authorization: Bearer $KEY" http://localhost:3000/api/bynet/order-notes
+curl -H "Authorization: Bearer $KEY" http://localhost:3000/api/bynet/customers
+curl -H "Authorization: Bearer $KEY" http://localhost:3000/api/bynet/catalog
+curl -X POST -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \\
+  -d '{"status":"shipped","tracking":{"carrier":"Andreani","code":"ABC123","url":"https://..."}}' \\
+  http://localhost:3000/api/bynet/orders/<id-del-pedido>/status
+curl -X PUT -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \\
+  -d '{"mode":"upsert","products":[{"sku":"tel-alas","name":"Autoperforante TEL ALAS","brand":"TEL","category":"Tornillos y fijaciones","price":23900,"stock":100,"visible":true}]}' \\
+  http://localhost:3000/api/bynet/catalog
+```
+
+Endpoints: `GET /ping`, `GET /orders`, `GET /order-notes`, `POST /orders/<id>/status`, `GET|PUT /catalog`, `GET /customers`. Sin clave configurada responden `503`; con clave incorrecta, `401`. Los productos se emparejan por `sku` = código (slug) del producto; las fotos que manda Bynet en base64 se guardan en `public/products/bynet/`. `mode: "replace"` oculta (no borra) los productos que no vienen en el envío.
+
 ## Publicar en producción
 
 La forma más simple es [Vercel](https://vercel.com): importás el repo, cargás las variables de entorno y listo. El dominio (ej. `somostresbe.com`) se apunta desde el panel de Vercel.

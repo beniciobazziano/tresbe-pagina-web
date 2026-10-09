@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ClipboardList, Package, UsersRound } from "lucide-react";
+import { ClipboardList, Package, Plug, UsersRound } from "lucide-react";
 import { isAdminRequest } from "@/lib/admin-auth";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { AdminLogoutButton } from "@/components/admin/AdminLogoutButton";
@@ -39,6 +39,12 @@ export default async function AdminPanelLayout({
             className="flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium text-concrete-700 hover:bg-concrete-100"
           >
             <UsersRound className="size-4" /> Clientes
+          </Link>
+          <Link
+            href="/admin/configuracion"
+            className="flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium text-concrete-700 hover:bg-concrete-100"
+          >
+            <Plug className="size-4" /> Bynet
           </Link>
           <AdminLogoutButton />
         </nav>

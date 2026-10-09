@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight, Minus, Plus, ShoppingCart, Trash2, Truck } from "lucide-react";
-import { useCart } from "@/components/cart/CartProvider";
+import { lineId, useCart } from "@/components/cart/CartProvider";
 import { useCustomer } from "@/components/customer/CustomerProvider";
 import { ProductImage } from "@/components/ProductImage";
 import { discountedPrice, formatARS } from "@/lib/site";
@@ -47,9 +47,9 @@ export default function CarritoPage() {
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_360px]">
         <ul className="space-y-4">
-          {items.map(({ product, quantity }) => (
+          {items.map(({ product, quantity, options }) => (
             <li
-              key={product.id}
+              key={lineId(product.id, options)}
               className="flex gap-4 rounded-xl border border-concrete-200 bg-white p-4"
             >
               <Link
@@ -68,14 +68,15 @@ export default function CarritoPage() {
                       {product.name}
                     </Link>
                     <p className="mt-0.5 text-xs text-concrete-500">
-                      {product.unit}
+                      {[options?.variant, options?.size, options?.color, options?.packaging].filter(Boolean).join(" · ") ||
+                        product.unit}
                       {product.bulky && " · flete a cotizar"}
                     </p>
                   </div>
                   <button
                     type="button"
                     aria-label={`Quitar ${product.name}`}
-                    onClick={() => removeItem(product.id)}
+                    onClick={() => removeItem(lineId(product.id, options))}
                     className="flex size-8 shrink-0 items-center justify-center rounded-full text-concrete-400 hover:bg-red-50 hover:text-red-600"
                   >
                     <Trash2 className="size-4" />
@@ -86,7 +87,7 @@ export default function CarritoPage() {
                     <button
                       type="button"
                       aria-label="Restar uno"
-                      onClick={() => setQuantity(product.id, quantity - 1)}
+                      onClick={() => setQuantity(lineId(product.id, options), quantity - 1)}
                       className="flex size-8 items-center justify-center rounded-l-full text-concrete-700 hover:bg-concrete-100"
                     >
                       <Minus className="size-3.5" />
@@ -97,7 +98,7 @@ export default function CarritoPage() {
                     <button
                       type="button"
                       aria-label="Sumar uno"
-                      onClick={() => setQuantity(product.id, quantity + 1)}
+                      onClick={() => setQuantity(lineId(product.id, options), quantity + 1)}
                       className="flex size-8 items-center justify-center rounded-r-full text-concrete-700 hover:bg-concrete-100"
                     >
                       <Plus className="size-3.5" />
@@ -151,7 +152,8 @@ export default function CarritoPage() {
             href="/checkout"
             className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-lime-500 text-sm font-semibold text-steel-950 transition-colors hover:bg-lime-400"
           >
-            Finalizar compra <ArrowRight className="size-4" />
+            {customer ? "Enviar pedido" : "Finalizar compra"}{" "}
+            <ArrowRight className="size-4" />
           </Link>
           <Link
             href="/productos"

@@ -1,7 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PackageSearch } from "lucide-react";
-import { getBrands, getCategories, getProducts } from "@/lib/catalog";
+import {
+  getBrands,
+  getCategoriesWithProducts,
+  getProducts,
+} from "@/lib/catalog";
+import { getSessionCustomer } from "@/lib/customers";
+import { sortCatalog } from "@/lib/product-order";
+import { Pager } from "@/components/Pager";
 import { ProductCard } from "@/components/ProductCard";
 import { SearchBox } from "@/components/SearchBox";
 
@@ -10,6 +17,8 @@ export const metadata: Metadata = {
   description:
     "Catálogo completo de insumos para construcción en seco: tornillos TEL, perfiles, placas, aislaciones y herramientas.",
 };
+
+const PAGE_SIZE = 24;
 
 function buildQuery(params: {
   categoria?: string;
@@ -27,19 +36,35 @@ function buildQuery(params: {
 export default async function ProductosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ categoria?: string; marca?: string; q?: string }>;
+  searchParams: Promise<{
+    categoria?: string;
+    marca?: string;
+    q?: string;
+    page?: string;
+  }>;
 }) {
-  const { categoria, marca, q } = await searchParams;
-  const [categories, brands, products] = await Promise.all([
-    getCategories(),
+  const { categoria, marca, q, page: pageParam } = await searchParams;
+  const [categories, brands, fetchedProducts, customer] = await Promise.all([
+    getCategoriesWithProducts(),
     getBrands(),
     getProducts({ categorySlug: categoria, brand: marca, search: q }),
+    getSessionCustomer(),
   ]);
 
   const activeCategory = categories.find((c) => c.slug === categoria);
   const activeBrand = brands.find(
     (b) => b.toLowerCase() === marca?.toLowerCase()
   );
+
+  // Orden de la tienda: los tornillos TEL primero y el resto por grupo
+  // (combos, a batería, baterías, a cable, bolsos, manuales).
+  const allProducts = sortCatalog(fetchedProducts);
+
+  // El catálogo puede tener miles de productos: paginamos para que la
+  // página cargue rápido en vez de renderizarlos todos de una vez.
+  const totalPages = Math.max(1, Math.ceil(allProducts.length / PAGE_SIZE));
+  const page = Math.min(totalPages, Math.max(1, Number(pageParam) || 1));
+  const products = allProducts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const chipClass = (active: boolean) =>
     `rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
@@ -68,27 +93,8 @@ export default async function ProductosPage({
         <SearchBox initialQuery={q ?? ""} categoria={categoria} marca={marca} />
       </div>
 
-      {/* Filtro por rubro */}
+      {/* Filtro por marca (único filtro visible) */}
       <div className="mt-6 flex flex-wrap items-center gap-2">
-        <span className="tech-label mr-1 text-[10px] text-concrete-500">
-          Rubro
-        </span>
-        <Link href={buildQuery({ marca, q })} className={chipClass(!categoria)}>
-          Todos
-        </Link>
-        {categories.map((cat) => (
-          <Link
-            key={cat.slug}
-            href={buildQuery({ categoria: cat.slug, marca, q })}
-            className={chipClass(categoria === cat.slug)}
-          >
-            {cat.name}
-          </Link>
-        ))}
-      </div>
-
-      {/* Filtro por marca */}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
         <span className="tech-label mr-1 text-[10px] text-concrete-500">
           Marca
         </span>
@@ -126,15 +132,22 @@ export default async function ProductosPage({
       ) : (
         <>
           <p className="mt-6 text-xs text-concrete-500">
-            {products.length} producto{products.length !== 1 && "s"}
+            {allProducts.length} producto{allProducts.length !== 1 && "s"}
             {activeBrand && ` de ${activeBrand}`}
             {activeCategory && ` en ${activeCategory.name}`}
+            {totalPages > 1 && ` · página ${page} de ${totalPages}`}
           </p>
           <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
             {products.map((product) => (
-              <ProductCard key={product.id} product={product} />
+              <ProductCard key={product.id} product={product} customer={customer} />
             ))}
           </div>
+          <Pager
+            page={page}
+            totalPages={totalPages}
+            basePath="/productos"
+            params={{ categoria, marca, q }}
+          />
         </>
       )}
     </div>

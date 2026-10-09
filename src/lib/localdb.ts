@@ -4,7 +4,13 @@ import { createHash, randomBytes, randomUUID } from "crypto";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { seedCategories, seedProducts } from "./data/seed";
-import type { AdminCustomer, Category, Order, Product } from "./types";
+import type {
+  AdminCustomer,
+  Category,
+  CustomerType,
+  Order,
+  Product,
+} from "./types";
 
 /**
  * Almacén local en archivos JSON (carpeta data/, fuera de git).
@@ -41,6 +47,10 @@ export async function localSaveProducts(products: Product[]) {
 
 export async function localGetCategories(): Promise<Category[]> {
   return (await readJson<Category[]>("categories.json")) ?? seedCategories;
+}
+
+export async function localSaveCategories(categories: Category[]) {
+  await writeJson("categories.json", categories);
 }
 
 export async function localUpsertProduct(
@@ -83,8 +93,22 @@ export async function localUpdateOrderStatus(id: string, status: Order["status"]
   const order = orders.find((o) => o.id === id);
   if (order) {
     order.status = status;
+    order.updated_at = new Date().toISOString();
     await writeJson("orders.json", orders);
   }
+}
+
+/** Aplica cambios parciales a un pedido (estado, seguimiento). false si no existe. */
+export async function localUpdateOrder(
+  id: string,
+  patch: Partial<Omit<Order, "id" | "created_at">>
+): Promise<boolean> {
+  const orders = await localGetOrders();
+  const index = orders.findIndex((o) => o.id === id);
+  if (index === -1) return false;
+  orders[index] = { ...orders[index], ...patch, id, created_at: orders[index].created_at };
+  await writeJson("orders.json", orders);
+  return true;
 }
 
 // ── Clientes B2B ──────────────────────────────────────────────────────
@@ -92,6 +116,12 @@ export async function localUpdateOrderStatus(id: string, status: Order["status"]
 interface LocalCustomer extends AdminCustomer {
   salt: string;
   password_hash: string;
+  markups?: Record<string, number>;
+  email?: string | null;
+  phone?: string | null;
+  cuit?: string | null;
+  postal_code?: string | null;
+  self_registered?: boolean;
 }
 
 function hashPassword(password: string, salt: string) {
@@ -108,6 +138,7 @@ const demoCustomer = (): LocalCustomer => {
     notes:
       "Cuenta demo. Retiros: jueves de 9 a 12. Cuenta corriente a 30 días con factura A.",
     active: true,
+    customer_type: "distribuidora",
     salt,
     password_hash: hashPassword("tresbe123", salt),
   };
@@ -126,31 +157,101 @@ export async function localListCustomers(): Promise<AdminCustomer[]> {
   return rows.map(({ salt: _s, password_hash: _p, ...pub }) => pub);
 }
 
+const toCustomer = (row: LocalCustomer) => ({
+  id: row.id,
+  name: row.name,
+  discount_pct: row.discount_pct,
+  notes: row.notes,
+  customer_type: row.customer_type ?? "publico",
+  markups: row.markups ?? {},
+  email: row.email ?? null,
+  phone: row.phone ?? null,
+  postal_code: row.postal_code ?? null,
+  self_registered: row.self_registered ?? false,
+});
+
+/** Acepta el usuario que dio el admin o el email con el que se registró */
 export async function localAuthCustomer(username: string, password: string) {
   const rows = await localGetCustomersRaw();
+  const ident = username.trim().toLowerCase();
   const row = rows.find(
-    (c) => c.username === username.trim().toLowerCase() && c.active
+    (c) => (c.username === ident || c.email?.toLowerCase() === ident) && c.active
   );
   if (!row) return null;
   if (hashPassword(password, row.salt) !== row.password_hash) return null;
-  return {
-    id: row.id,
-    name: row.name,
-    discount_pct: row.discount_pct,
-    notes: row.notes,
-  };
+  return toCustomer(row);
 }
 
 export async function localGetCustomer(id: string) {
   const rows = await localGetCustomersRaw();
   const row = rows.find((c) => c.id === id && c.active);
   if (!row) return null;
-  return {
-    id: row.id,
-    name: row.name,
-    discount_pct: row.discount_pct,
-    notes: row.notes,
+  return toCustomer(row);
+}
+
+/**
+ * Alta que hace la propia persona desde /cliente/registro: cuenta de
+ * público, sin descuento. El usuario es el email.
+ */
+export async function localRegisterCustomer(draft: {
+  name: string;
+  email: string;
+  phone: string;
+  postal_code: string;
+  password: string;
+}) {
+  const rows = await localGetCustomersRaw();
+  const email = draft.email.trim().toLowerCase();
+
+  if (rows.some((c) => c.username === email || c.email?.toLowerCase() === email)) {
+    throw new Error("Ya hay una cuenta con ese email");
+  }
+
+  const salt = randomBytes(8).toString("hex");
+  const row: LocalCustomer = {
+    id: randomUUID(),
+    username: email,
+    name: draft.name.trim(),
+    discount_pct: 0,
+    notes: null,
+    active: true,
+    customer_type: "publico",
+    email,
+    phone: draft.phone.trim(),
+    postal_code: draft.postal_code.trim(),
+    self_registered: true,
+    salt,
+    password_hash: hashPassword(draft.password, salt),
   };
+  rows.push(row);
+  await writeJson("customers.json", rows);
+  return toCustomer(row);
+}
+
+/** Datos de entrega que el cliente edita desde su cuenta */
+export async function localUpdateCustomerProfile(
+  id: string,
+  patch: { phone?: string; postal_code?: string }
+) {
+  const rows = await localGetCustomersRaw();
+  const row = rows.find((c) => c.id === id);
+  if (!row) throw new Error("Cliente no encontrado");
+  if (patch.phone !== undefined) row.phone = patch.phone.trim();
+  if (patch.postal_code !== undefined) row.postal_code = patch.postal_code.trim();
+  await writeJson("customers.json", rows);
+  return toCustomer(row);
+}
+
+/** Guarda las rentabilidades por marca que configura el propio cliente */
+export async function localSetCustomerMarkups(
+  id: string,
+  markups: Record<string, number>
+) {
+  const rows = await localGetCustomersRaw();
+  const row = rows.find((c) => c.id === id);
+  if (!row) throw new Error("Cliente no encontrado");
+  row.markups = markups;
+  await writeJson("customers.json", rows);
 }
 
 export async function localUpsertCustomer(draft: {
@@ -161,6 +262,7 @@ export async function localUpsertCustomer(draft: {
   discount_pct: number;
   notes: string | null;
   active: boolean;
+  customer_type: CustomerType;
 }) {
   const rows = await localGetCustomersRaw();
   const username = draft.username.trim().toLowerCase();
@@ -176,6 +278,7 @@ export async function localUpsertCustomer(draft: {
     row.discount_pct = draft.discount_pct;
     row.notes = draft.notes;
     row.active = draft.active;
+    row.customer_type = draft.customer_type;
     if (draft.password && draft.password.length >= 6) {
       row.salt = randomBytes(8).toString("hex");
       row.password_hash = hashPassword(draft.password, row.salt);
@@ -192,6 +295,7 @@ export async function localUpsertCustomer(draft: {
       discount_pct: draft.discount_pct,
       notes: draft.notes,
       active: draft.active,
+      customer_type: draft.customer_type,
       salt,
       password_hash: hashPassword(draft.password, salt),
     });

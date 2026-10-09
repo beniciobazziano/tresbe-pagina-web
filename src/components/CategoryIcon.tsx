@@ -1,6 +1,10 @@
 import {
   AlignVerticalJustifyCenter,
+  BatteryCharging,
+  BatteryFull,
   Bolt,
+  Drill,
+  Hammer,
   Layers,
   LayoutPanelLeft,
   PaintRoller,
@@ -15,9 +19,14 @@ const icons: Record<string, LucideIcon> = {
   AlignVerticalJustifyCenter,
   LayoutPanelLeft,
   Layers,
+  Package,
+  BatteryCharging,
+  BatteryFull,
   Zap,
+  Drill,
   Wrench,
   PaintRoller,
+  Hammer,
 };
 
 export function CategoryIcon({

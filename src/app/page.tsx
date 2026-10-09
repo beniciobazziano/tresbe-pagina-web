@@ -7,21 +7,81 @@ import {
   Store,
   Truck,
 } from "lucide-react";
-import { getCategories, getProducts } from "@/lib/catalog";
+import {
+  getBrands,
+  getCategoriesWithProducts,
+  getProducts,
+} from "@/lib/catalog";
+import { getSessionCustomer } from "@/lib/customers";
 import { site, whatsappLink } from "@/lib/site";
 import { ProductCard } from "@/components/ProductCard";
 import { CategoryIcon } from "@/components/CategoryIcon";
+import { SearchBox } from "@/components/SearchBox";
 
 export default async function HomePage() {
-  const [categories, featured] = await Promise.all([
-    getCategories(),
+  const [categories, featured, customer, brands] = await Promise.all([
+    getCategoriesWithProducts(),
     getProducts({ featuredOnly: true }),
+    getSessionCustomer(),
+    getBrands(),
   ]);
 
   return (
     <>
-      {/* Hero */}
-      <section className="blueprint-grid relative overflow-hidden bg-steel-950 text-white">
+      {/* Celular: la home es la tienda — buscador directo, sin presentación */}
+      <section className="blueprint-grid bg-steel-950 text-white lg:hidden">
+        <div className="px-4 pb-6 pt-7">
+          <p className="tech-label text-lime-400">
+            Construcción en seco · Mar del Plata
+          </p>
+          <h1 className="mt-2 font-display text-2xl font-bold tracking-tight">
+            ¿Qué necesitás para tu obra?
+          </h1>
+          <div className="mt-4">
+            <SearchBox initialQuery="" />
+          </div>
+          {/* Accesos rápidos por marca */}
+          <div className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {brands.map((brand) => (
+              <Link
+                key={brand}
+                href={`/productos?marca=${encodeURIComponent(brand)}`}
+                className="shrink-0 rounded-full border border-steel-600/70 bg-steel-900/70 px-3.5 py-1.5 text-xs font-semibold text-steel-100 transition-colors hover:bg-steel-800"
+              >
+                {brand}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Celular: carrusel de los más vendidos */}
+      {featured.length > 0 && (
+        <section className="border-b border-concrete-200 bg-white lg:hidden">
+          <div className="px-4 py-6">
+            <p className="tech-label text-steel-500">Seleccionados</p>
+            <h2 className="mt-1 font-display text-xl font-bold tracking-tight">
+              Los más vendidos
+            </h2>
+            <div className="-mx-4 mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {featured.slice(0, 10).map((product) => (
+                <div key={product.id} className="w-44 shrink-0 snap-start">
+                  <ProductCard product={product} customer={customer} />
+                </div>
+              ))}
+            </div>
+            <Link
+              href="/productos"
+              className="mt-4 flex h-12 items-center justify-center gap-2 rounded-full bg-steel-600 text-sm font-semibold text-white hover:bg-steel-700"
+            >
+              Ver todo el catálogo <ArrowRight className="size-4" />
+            </Link>
+          </div>
+        </section>
+      )}
+
+      {/* Hero (escritorio) */}
+      <section className="blueprint-grid relative hidden overflow-hidden bg-steel-950 text-white lg:block">
         <div className="pointer-events-none absolute -right-32 -top-32 size-96 rounded-full bg-steel-600/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-40 left-1/4 size-96 rounded-full bg-lime-500/10 blur-3xl" />
         <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-20 lg:py-28">
@@ -65,13 +125,13 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Categorías */}
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
+      {/* Secciones */}
+      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-16">
         <div className="flex items-end justify-between gap-4">
           <div>
             <p className="tech-label text-steel-500">Catálogo</p>
             <h2 className="mt-2 font-display text-3xl font-bold tracking-tight">
-              Comprá por categoría
+              Comprá por sección
             </h2>
           </div>
           <Link
@@ -112,9 +172,9 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Destacados */}
+      {/* Destacados (escritorio: en móvil los muestra el carrusel) */}
       {featured.length > 0 && (
-        <section className="border-y border-concrete-200 bg-white">
+        <section className="hidden border-y border-concrete-200 bg-white lg:block">
           <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
             <p className="tech-label text-steel-500">Seleccionados</p>
             <h2 className="mt-2 font-display text-3xl font-bold tracking-tight">
@@ -122,15 +182,15 @@ export default async function HomePage() {
             </h2>
             <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
               {featured.slice(0, 8).map((product) => (
-                <ProductCard key={product.id} product={product} />
+                <ProductCard key={product.id} product={product} customer={customer} />
               ))}
             </div>
           </div>
         </section>
       )}
 
-      {/* Beneficios */}
-      <section className="border-b border-concrete-200 bg-white">
+      {/* Beneficios (solo escritorio: en móvil la home es la tienda) */}
+      <section className="hidden border-b border-concrete-200 bg-white lg:block">
         <div className="mx-auto grid max-w-7xl gap-6 px-4 py-10 sm:grid-cols-3 sm:px-6">
           <div className="flex items-start gap-4">
             <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-steel-50 text-steel-600">
@@ -171,8 +231,8 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Sistemas constructivos */}
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
+      {/* Sistemas constructivos (solo escritorio) */}
+      <section className="mx-auto hidden max-w-7xl px-4 py-16 sm:px-6 lg:block">
         <p className="tech-label text-steel-500">Aprendé con nosotros</p>
         <h2 className="mt-2 max-w-xl font-display text-3xl font-bold tracking-tight">
           Sistemas constructivos en seco, explicados de verdad
@@ -213,8 +273,8 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* CTA WhatsApp */}
-      <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-6">
+      {/* CTA WhatsApp (solo escritorio) */}
+      <section className="mx-auto hidden max-w-7xl px-4 pb-20 sm:px-6 lg:block">
         <div className="flex flex-col items-start justify-between gap-6 rounded-2xl bg-lime-500 p-8 sm:flex-row sm:items-center lg:p-12">
           <div>
             <h2 className="font-display text-2xl font-bold text-steel-950 lg:text-3xl">

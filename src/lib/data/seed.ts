@@ -1,5 +1,13 @@
 import type { Category, Product } from "../types";
+import { adhesilProducts } from "./adhesil-products";
+import { dorkingProducts } from "./dorking-products";
+import { fischerCuratedProducts } from "./fischer-curated-products";
+import { ingcoProducts } from "./ingco-products";
+import { iturriaProducts } from "./iturria-products";
+import { milwaukeeProducts } from "./milwaukee-products";
+import { rothoblaasProducts } from "./rothoblaas-products";
 import { telProducts } from "./tel-products";
+import { telplastProducts } from "./telplast-products";
 
 /**
  * Catálogo de ejemplo. Se usa cuando Supabase todavía no está configurado,
@@ -42,27 +50,70 @@ export const seedCategories: Category[] = [
   },
   {
     id: "c5",
-    slug: "herramientas-electricas",
-    name: "Herramientas Eléctricas",
-    description: "Atornilladores, amoladoras, sierras y herramientas Total para obra en seco.",
-    icon: "Zap",
+    slug: "combos",
+    name: "Combos",
+    description:
+      "Kits de máquina con baterías, cargador y accesorios, listos para trabajar.",
+    icon: "Package",
     position: 5,
   },
   {
     id: "c6",
-    slug: "herramientas-manuales",
-    name: "Herramientas Manuales",
-    description: "Tijeras de corte, niveles, espátulas y herramientas de mano para el montaje.",
-    icon: "Wrench",
+    slug: "maquinas-a-bateria",
+    name: "Máquinas Solas",
+    description:
+      "Máquinas a batería sin batería ni cargador, para sumar a la que ya tenés.",
+    icon: "BatteryCharging",
     position: 6,
   },
   {
     id: "c7",
+    slug: "baterias-y-cargadores",
+    name: "Baterías",
+    description: "Baterías de litio y cargadores de las líneas P20S, S12 y 42V.",
+    icon: "BatteryFull",
+    position: 7,
+  },
+  {
+    id: "c8",
+    slug: "maquinas-electricas",
+    name: "Máquinas Eléctricas",
+    description:
+      "Amoladoras, taladros, sierras y demás máquinas a cable, de 220 V.",
+    icon: "Zap",
+    position: 8,
+  },
+  {
+    id: "c9",
+    slug: "herramientas-electricas",
+    name: "Herramientas Eléctricas",
+    description: "Atornilladores, amoladoras, sierras y herramientas Total para obra en seco.",
+    icon: "Drill",
+    position: 9,
+  },
+  {
+    id: "c10",
+    slug: "herramientas-manuales",
+    name: "Herramientas Manuales",
+    description: "Tijeras de corte, niveles, espátulas y herramientas de mano para el montaje.",
+    icon: "Wrench",
+    position: 10,
+  },
+  {
+    id: "c11",
     slug: "accesorios-y-terminaciones",
     name: "Accesorios y Terminaciones",
     description: "Masillas, cintas, cantoneras y todo lo necesario para la terminación perfecta.",
     icon: "PaintRoller",
-    position: 7,
+    position: 11,
+  },
+  {
+    id: "c12",
+    slug: "clavadoras-y-clavos",
+    name: "Clavadoras y Clavos",
+    description: "Clavadoras neumáticas Dorking y clavos coil, strip y punta París para wood frame y embalaje.",
+    icon: "Hammer",
+    position: 12,
   },
 ];
 
@@ -72,6 +123,22 @@ const id = () => `p${++n}`;
 export const seedProducts: Product[] = [
   // — Tornillos y Fijaciones: línea completa TEL (importada del fabricante)
   ...telProducts.map((p) => ({ ...p, id: id() })),
+  // — Aislaciones: cinta SIMPLA y membrana TRASPIR 110 (Rothoblaas)
+  ...rothoblaasProducts.map((p) => ({ ...p, id: id() })),
+  // — Clavadoras y Clavos: línea Dorking (clavadoras neumáticas + clavos)
+  ...dorkingProducts.map((p) => ({ ...p, id: id() })),
+  // — Milwaukee: catálogo oficial del distribuidor Papierttei (sin accesorios)
+  ...milwaukeeProducts.map((p) => ({ ...p, id: id() })),
+  // — Fischer / Bosch / DeWalt: catálogos oficiales que distribuye Iturria S.A.
+  ...iturriaProducts.map((p) => ({ ...p, id: id() })),
+  ...ingcoProducts.map((p) => ({ ...p, id: id() })),
+  // — Telplast: línea WOW! de adhesivos y selladores
+  ...telplastProducts.map((p) => ({ ...p, id: id() })),
+  // — Fischer: espumas, selladores y anclajes curados por el usuario (aparte
+  // del catálogo masivo de iturriaProducts, sin foto/inactivo)
+  ...fischerCuratedProducts.map((p) => ({ ...p, id: id() })),
+  // — Adhesil: siliconas (neutra, acética, 11 PRO) y salchichas
+  ...adhesilProducts.map((p) => ({ ...p, id: id() })),
   {
     id: id(),
     slug: "tarugo-fischer-sx8-caja-100",

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import { BackButton } from "@/components/BackButton";
 import { CartProvider } from "@/components/cart/CartProvider";
 import { CustomerProvider } from "@/components/customer/CustomerProvider";
 import { Header } from "@/components/Header";
@@ -38,6 +39,7 @@ export default function RootLayout({
         <CustomerProvider>
           <CartProvider>
             <Header />
+            <BackButton />
             <main className="flex-1">{children}</main>
             <Footer />
             <WhatsAppButton />

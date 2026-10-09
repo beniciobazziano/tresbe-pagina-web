@@ -10,7 +10,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import type { AdminCustomer } from "@/lib/types";
+import type { AdminCustomer, CustomerType } from "@/lib/types";
 
 interface Draft {
   id: string | null;
@@ -20,6 +20,7 @@ interface Draft {
   discount_pct: number;
   notes: string;
   active: boolean;
+  customer_type: CustomerType;
 }
 
 const emptyDraft: Draft = {
@@ -30,6 +31,7 @@ const emptyDraft: Draft = {
   discount_pct: 0,
   notes: "",
   active: true,
+  customer_type: "publico",
 };
 
 export function CustomersPanel() {
@@ -173,6 +175,26 @@ export function CustomersPanel() {
               />
             </label>
             <label className="block text-sm">
+              <span className="mb-1 block font-medium">Tipo de cuenta</span>
+              <select
+                value={draft.customer_type}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    customer_type: e.target.value as CustomerType,
+                  })
+                }
+                className={inputClass}
+              >
+                <option value="publico">
+                  Venta al público (ve todo el catálogo)
+                </option>
+                <option value="distribuidora">
+                  Distribuidora / reventa (+ sección de distribuidora)
+                </option>
+              </select>
+            </label>
+            <label className="block text-sm">
               <span className="mb-1 block font-medium">Descuento (%)</span>
               <input
                 type="number"
@@ -259,6 +281,11 @@ export function CustomersPanel() {
                   {c.notes ? ` · ${c.notes}` : ""}
                 </p>
               </div>
+              {c.customer_type === "distribuidora" && (
+                <span className="shrink-0 rounded-full bg-steel-100 px-3 py-1 text-xs font-semibold text-steel-800">
+                  Distribuidora
+                </span>
+              )}
               <span className="flex shrink-0 items-center gap-1 rounded-full bg-lime-100 px-3 py-1 text-xs font-bold text-lime-800">
                 <BadgePercent className="size-3.5" /> {c.discount_pct}%
               </span>
@@ -275,6 +302,7 @@ export function CustomersPanel() {
                       discount_pct: c.discount_pct,
                       notes: c.notes ?? "",
                       active: c.active,
+                      customer_type: c.customer_type ?? "publico",
                     })
                   }
                   className="flex size-9 items-center justify-center rounded-full text-concrete-500 hover:bg-steel-50 hover:text-steel-700"

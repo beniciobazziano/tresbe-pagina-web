@@ -8,10 +8,13 @@ export function SearchBox({
   initialQuery,
   categoria,
   marca,
+  basePath = "/productos",
 }: {
   initialQuery: string;
   categoria?: string;
   marca?: string;
+  /** Permite reutilizar el buscador en la sección de distribuidora */
+  basePath?: string;
 }) {
   const router = useRouter();
   const [value, setValue] = useState(initialQuery);
@@ -21,7 +24,7 @@ export function SearchBox({
     if (categoria) params.set("categoria", categoria);
     if (marca) params.set("marca", marca);
     if (query.trim()) params.set("q", query.trim());
-    router.push(`/productos${params.size ? `?${params}` : ""}`);
+    router.push(`${basePath}${params.size ? `?${params}` : ""}`);
   }
 
   return (

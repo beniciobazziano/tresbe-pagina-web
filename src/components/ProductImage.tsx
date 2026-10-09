@@ -23,7 +23,7 @@ export function ProductImage({
         alt={product.name}
         fill
         sizes={sizes ?? "(min-width: 1024px) 25vw, 50vw"}
-        className="object-cover"
+        className="object-contain p-3 transition-transform duration-300 ease-out group-hover:scale-110"
       />
     );
   }

@@ -4,6 +4,8 @@ export const site = {
   whatsapp: "5492233121896",
   whatsappDisplay: "+54 9 223 312-1896",
   email: "info.tresbedistribuidora@gmail.com",
+  /** Casilla que recibe las notas de pedido de la distribuidora */
+  ordersEmail: "tresbenotaspedido@gmail.com",
   address: "Chacabuco 6311, Mar del Plata, Buenos Aires",
   hours: "Lun a Jue 08:00–17:00 · Vie 08:00–16:00",
   instagram: "https://www.instagram.com/somos_tresbe",
@@ -27,4 +29,9 @@ export function formatARS(value: number) {
     currency: "ARS",
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+/** Precio para mostrar en catálogo: sin precio cargado (0) => "Consultar precio" */
+export function formatPriceLabel(value: number) {
+  return value > 0 ? formatARS(value) : "Consultar precio";
 }

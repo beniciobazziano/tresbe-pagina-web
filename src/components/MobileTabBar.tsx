@@ -36,7 +36,7 @@ export function MobileTabBar() {
     },
     {
       href: customer ? "/cliente" : "/cliente/login",
-      label: customer ? "Mi cuenta" : "Cliente",
+      label: customer ? "Mi cuenta" : "Ingresar",
       icon: UserRound,
       active: pathname.startsWith("/cliente"),
     },

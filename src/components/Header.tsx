@@ -4,7 +4,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Menu, ShoppingCart, UserRound, X } from "lucide-react";
+import {
+  Menu,
+  ShoppingCart,
+  Truck,
+  TrendingUp,
+  UserRound,
+  X,
+} from "lucide-react";
 import { useCart } from "./cart/CartProvider";
 import { useCustomer } from "./customer/CustomerProvider";
 
@@ -53,6 +60,32 @@ export function Header() {
               </Link>
             );
           })}
+          {/* Solo para cuentas de reventa */}
+          {customer?.customer_type === "distribuidora" && (
+            <Link
+              href="/distribuidora"
+              className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+                pathname.startsWith("/distribuidora")
+                  ? "bg-steel-950 text-white"
+                  : "bg-steel-100 text-steel-800 hover:bg-steel-200"
+              }`}
+            >
+              <Truck className="size-4" /> Productos distribuidora
+            </Link>
+          )}
+          {/* Solo para clientes con cuenta */}
+          {customer && (
+            <Link
+              href="/cliente/rentabilidades"
+              className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+                pathname.startsWith("/cliente/rentabilidades")
+                  ? "bg-lime-100 text-lime-800"
+                  : "text-lime-700 hover:bg-lime-50"
+              }`}
+            >
+              <TrendingUp className="size-4" /> Rentabilidades
+            </Link>
+          )}
         </nav>
 
         <div className="flex items-center gap-2">
@@ -68,7 +101,7 @@ export function Header() {
             {customerReady && customer ? (
               <span className="max-w-36 truncate">{customer.name}</span>
             ) : (
-              "Ya soy cliente"
+              "Ingresar"
             )}
           </Link>
           <Link
@@ -106,13 +139,31 @@ export function Header() {
               {item.label}
             </Link>
           ))}
+          {customer?.customer_type === "distribuidora" && (
+            <Link
+              href="/distribuidora"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 rounded-md px-3 py-2.5 text-sm font-semibold text-steel-800 hover:bg-steel-50"
+            >
+              <Truck className="size-4" /> Productos distribuidora
+            </Link>
+          )}
+          {customer && (
+            <Link
+              href="/cliente/rentabilidades"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 rounded-md px-3 py-2.5 text-sm font-semibold text-lime-700 hover:bg-lime-50"
+            >
+              <TrendingUp className="size-4" /> Rentabilidades
+            </Link>
+          )}
           <Link
             href={customer ? "/cliente" : "/cliente/login"}
             onClick={() => setOpen(false)}
             className="mt-1 flex items-center gap-2 rounded-md border-t border-concrete-100 px-3 py-2.5 text-sm font-semibold text-steel-700 hover:bg-steel-50"
           >
             <UserRound className="size-4" />
-            {customer ? customer.name : "Ya soy cliente"}
+            {customer ? customer.name : "Ingresar / Registrarme"}
           </Link>
         </nav>
       )}

@@ -7,14 +7,33 @@ import {
   verifyCustomerToken,
 } from "@/lib/customers";
 import { saveOrder } from "@/lib/orders";
+import { cotizarEnvio, isAndreaniConfigured } from "@/lib/shipping/andreani";
+import { armarBultos } from "@/lib/shipping/packing";
 import { discountedPrice, site, whatsappLink } from "@/lib/site";
-import type { OrderItem, PaymentMethod, ShippingMethod } from "@/lib/types";
+import type {
+  OrderItem,
+  PaymentMethod,
+  Product,
+  ShippingMethod,
+} from "@/lib/types";
+
+/**
+ * Qué medios de pago están configurados: el checkout muestra solo esos
+ * (WhatsApp está siempre) para que ningún camino termine en error.
+ */
+export async function GET() {
+  return NextResponse.json({
+    mercadopago: Boolean(process.env.MP_ACCESS_TOKEN),
+    stripe: Boolean(process.env.STRIPE_SECRET_KEY),
+    envioOnline: isAndreaniConfigured,
+  });
+}
 
 interface CheckoutPayload {
   customer: { name: string; email: string; phone: string };
-  shipping: { method: ShippingMethod; address?: string };
+  shipping: { method: ShippingMethod; address?: string; postalCode?: string };
   payment: PaymentMethod;
-  items: { slug: string; quantity: number }[];
+  items: { slug: string; quantity: number; size?: string; color?: string; variant?: string; packaging?: string }[];
   notes?: string;
 }
 
@@ -51,6 +70,7 @@ export async function POST(request: Request) {
   // Los precios se releen del catálogo en el servidor: el total nunca
   // se confía del navegador.
   const orderItems: OrderItem[] = [];
+  const resolved: { product: Product; quantity: number }[] = [];
   let hasBulky = false;
   for (const item of items) {
     const product = await getProductBySlug(item.slug);
@@ -62,11 +82,18 @@ export async function POST(request: Request) {
       );
     }
     if (product.bulky) hasBulky = true;
+    resolved.push({ product, quantity });
     orderItems.push({
       product_id: product.id,
       name: product.name,
       unit_price: product.price,
       quantity,
+      code: product.slug,
+      unit: product.unit,
+      size: item.size,
+      color: item.color,
+      variant: item.variant,
+      packaging: item.packaging,
     });
   }
 
@@ -81,12 +108,42 @@ export async function POST(request: Request) {
     ...i,
     unit_price: discountedPrice(i.unit_price, discountPct),
   }));
-  const total = payItems.reduce((acc, i) => acc + i.unit_price * i.quantity, 0);
+  const subtotal = payItems.reduce((acc, i) => acc + i.unit_price * i.quantity, 0);
 
-  // Con voluminosos + envío, el pedido pasa a cotización: primero el flete,
-  // después el pago.
+  // El flete se vuelve a cotizar acá contra Andreani: el costo que muestra
+  // el navegador es informativo, el que se cobra es este.
+  const postalCode = (shipping.postalCode ?? "")
+    .trim()
+    .replace(/\D/g, "")
+    .slice(0, 4);
+  let shippingCost = 0;
+  let shippingQuoteFailed = false;
+
+  if (shipping.method === "envio" && !hasBulky && isAndreaniConfigured) {
+    if (!/^\d{4}$/.test(postalCode)) {
+      return NextResponse.json(
+        { error: "Ingresá un código postal de 4 números para calcular el envío." },
+        { status: 400 }
+      );
+    }
+    try {
+      const { bultos } = armarBultos(resolved, subtotal);
+      const quote = await cotizarEnvio(postalCode, bultos);
+      if (quote) shippingCost = Math.round(quote.total);
+      else shippingQuoteFailed = true;
+    } catch (error) {
+      console.error("[checkout] cotización Andreani:", error);
+      shippingQuoteFailed = true;
+    }
+  }
+
+  const total = subtotal + shippingCost;
+
+  // Con voluminosos + envío (o si no se pudo cotizar el flete), el pedido
+  // pasa a cotización: primero el flete, después el pago.
   const needsQuote =
-    shipping.method === "cotizacion" || (shipping.method === "envio" && hasBulky);
+    shipping.method === "cotizacion" ||
+    (shipping.method === "envio" && (hasBulky || shippingQuoteFailed));
   const effectiveShipping: ShippingMethod = needsQuote ? "cotizacion" : shipping.method;
   const effectivePayment: PaymentMethod = needsQuote ? "whatsapp" : payment;
 
@@ -96,6 +153,8 @@ export async function POST(request: Request) {
     customer_phone: customer.phone.trim(),
     shipping_method: effectiveShipping,
     shipping_address: shipping.address?.trim() || null,
+    shipping_postal_code: postalCode || null,
+    shipping_cost: needsQuote ? 0 : shippingCost,
     payment_method: effectivePayment,
     status: needsQuote ? "a_cotizar" : "pendiente",
     items: orderItems,
@@ -118,7 +177,13 @@ export async function POST(request: Request) {
       ...(discountPct > 0
         ? [`Cuenta: ${account?.name} (descuento ${discountPct}%)`]
         : []),
-      `Total de productos: $${total.toLocaleString("es-AR")}`,
+      `Total de productos: $${subtotal.toLocaleString("es-AR")}`,
+      ...(shippingCost > 0 && !needsQuote
+        ? [
+            `Envío (Andreani, CP ${postalCode}): $${shippingCost.toLocaleString("es-AR")}`,
+            `Total: $${total.toLocaleString("es-AR")}`,
+          ]
+        : []),
       shipping.method === "retiro"
         ? "Retiro en el local (Chacabuco 6311)."
         : `Envío a: ${shipping.address ?? "a coordinar"}${needsQuote ? " (necesito cotización del flete)" : ""}`,
@@ -157,6 +222,9 @@ export async function POST(request: Request) {
           currency_id: "ARS",
         })),
         payer: { name: customer.name, email: customer.email },
+        ...(shippingCost > 0 && {
+          shipments: { cost: shippingCost, mode: "not_specified" as const },
+        }),
         external_reference: orderId,
         back_urls: {
           success: `${origin}/checkout/gracias?pedido=${shortId}&metodo=mercadopago`,
@@ -188,15 +256,29 @@ export async function POST(request: Request) {
     const stripe = new Stripe(secretKey);
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      line_items: payItems.map((i) => ({
-        price_data: {
-          currency: "ars",
-          product_data: { name: i.name },
-          // Stripe usa centavos
-          unit_amount: i.unit_price * 100,
-        },
-        quantity: i.quantity,
-      })),
+      line_items: [
+        ...payItems.map((i) => ({
+          price_data: {
+            currency: "ars",
+            product_data: { name: i.name },
+            // Stripe usa centavos
+            unit_amount: i.unit_price * 100,
+          },
+          quantity: i.quantity,
+        })),
+        ...(shippingCost > 0
+          ? [
+              {
+                price_data: {
+                  currency: "ars",
+                  product_data: { name: `Envío Andreani (CP ${postalCode})` },
+                  unit_amount: shippingCost * 100,
+                },
+                quantity: 1,
+              },
+            ]
+          : []),
+      ],
       customer_email: customer.email,
       client_reference_id: orderId,
       success_url: `${origin}/checkout/gracias?pedido=${shortId}&metodo=stripe`,
